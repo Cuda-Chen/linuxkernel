@@ -367,3 +367,4 @@
 358	i386	execveat		sys_execveat			stub32_execveat
 359	i386	listProcessInfo		sys_listProcessInfo
 360	i386	linux_survey_TT		sys_linux_survey_TT
+361	i386	linux_survey_VV		sys_linux_survey_VV

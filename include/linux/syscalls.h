@@ -884,4 +884,5 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
 
 asmlinkage long sys_listProcessInfo(void);
 asmlinkage long sys_linux_survey_TT(int pid, char *buf);
+asmlinkage long sys_linux_survey_VV(char *buf);
 #endif
