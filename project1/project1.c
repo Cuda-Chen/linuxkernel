@@ -11,9 +11,9 @@ int project1_hook_ready = 0 ;
 
 asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
 	printk("[%s] pid: %d : buf:%p \n", __FUNCTION__, pid, buf);
-	if(1 == project1_hook_ready){
-		project1_hook(pid, buf);
-	}
+	//if(1 == project1_hook_ready){
+	//	project1_hook(pid, buf);
+	//}
 
   printk("hi");
   struct task_struct *task;
@@ -46,6 +46,10 @@ asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
     } 
     vma = vma->vm_next;
   }
+
+	if(1 == project1_hook_ready){
+		project1_hook(pid, buf);
+	}
 
 return 0;
 }
