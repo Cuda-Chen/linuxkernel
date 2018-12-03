@@ -20,6 +20,7 @@ int project1_sys_func(int pid, char *result);
 int project1_sys_func(int pid, char *result)
 {
     int ret;
+    printk("[%s] pid:%d addr:%p \n", __FUNCTION__, pid , result);
 
     return ret;
 }
