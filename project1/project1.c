@@ -61,7 +61,7 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
 	struct pid *taskpid;
 
 	//taskpid = find_get_pid();
-	taskpid = task_pid_nr(current);
+	taskpid = task_pid_nr(current->pid);
 	task = pid_task(taskpid, PIDTYPE_PID );
 	if(task == NULL) {
 		printk("cannot find task: pid: %d \n", curpid);
