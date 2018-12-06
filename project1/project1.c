@@ -3,6 +3,10 @@
 #include<linux/init.h>
 #include<linux/sched.h>
 #include<linux/syscalls.h>
+//#include <unistd.h>
+//#include <sys/syscall.h>
+//#include <sys/types.h>
+//#include <pthread.h>
 #include "project1.h"
 
 int (*project1_hook)(int pid, char *result) = NULL;
@@ -60,10 +64,13 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
 	struct mm_struct *mm;
 	struct pid *taskpid;
 
-	taskpid = find_get_pid(curpid);
+	//int curpid = task_pid_nr(current->pid);
+	//int curpid = syscall(SYS_gettid);
+	//int curpid = pthread_self();
+	taskpid = find_get_pid(current->pid);
 	task = pid_task(taskpid, PIDTYPE_PID );
 	if(task == NULL) {
-		printk("cannot find task: pid: %d \n", curpid);
+		printk("cannot find task: pid: %d \n", taskpid);
 		return 0;
 	}
 
@@ -80,8 +87,8 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
 
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
-      printk("PID: %d virtual: %08lx-%08lx\n", pid, vma->vm_start, vma->vm_end);
-      printk("PID: %d physical: %08lx-%08lx\n", pid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
+      printk("PID: %d virtual: %08lx-%08lx\n", taskpid, vma->vm_start, vma->vm_end);
+      printk("PID: %d physical: %08lx-%08lx\n", taskpid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
     if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
       printk("virtual: %08lx-%08lx has corresponding physical\n", vma->vm_start, vma->vm_end);
     } 

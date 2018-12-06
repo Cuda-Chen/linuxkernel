@@ -17,6 +17,24 @@ MODULE_VERSION("0.1");            ///< A version number to inform users
 
 long project1_sys_func(int pid, char *result);
 
+#define PTRS_PER_PGD	4
+#define PTRS_PER_PUD	1
+#define PTRS_PER_PMD	512
+#define PTRS_PER_PTE	512
+#define PGDIR_SHIFT	30
+#define PTRS_PER_PGD	4
+#define PMD_SHIFT	21
+#define PTRS_PER_PMD	512
+#define PTRS_PER_PTE	512
+#define PAGE_SHIFT	12
+#define PAGE_MASK       (~(PAGE_SIZE-1))
+#define __va(x)		((void *)((unsigned long)(x)+PAGE_OFFSET))
+#define _pgd_offset(mm, addr)           (mm->pgd + (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)))
+#define _pud_offset(pgd, addr)          (pgd) //skip pud on x86 with PAE
+#define _pmd_offset(pud, addr)          ((pmd_t *)(unsigned long)__va((pud->pgd.pgd) & PTE_PFN_MASK) + ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+#define _pte_offset_kernel(pmd, addr)   ((pte_t *)(unsigned long)__va(pmd->pmd & PTE_PFN_MASK) + ((addr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr);
+
 long project1_sys_func(int pid, char *result)
 {
   printk("hi");
@@ -44,18 +62,53 @@ long project1_sys_func(int pid, char *result)
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
     printk("PID: %d virtual: %08lx-%08lx\n", pid, vma->vm_start, vma->vm_end);
-    printk("PID: %d physical: %08lx-%08lx\n", pid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
+    //printk("PID: %d physical: %08lx-%08lx\n", pid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
+    printk("PID: %d physical: %08lx-%08lx\n", pid, _virt_to_phys(mm, vma->vm_start), _virt_to_phys(mm, vma->vm_end));
     vma = vma->vm_next;
   }
 
   return 0;
 }
 
+unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr){
+  pgd_t *pgd;
+  pud_t *pud;
+  pmd_t *pmd;
+  pte_t *pte;
+  unsigned long paddr = 0;
+  unsigned long page_addr = 0;
+  unsigned long page_offset = 0;
+  pgd = _pgd_offset(mm, virt_addr);
+  printk("pgd: %08lx\n", *pgd);
+  if (pgd_none(*pgd) || pgd_bad(*pgd))
+    return 0;
+  pud = _pud_offset(pgd, virt_addr);
+  //printk("pud: %08lx\n", *pud);
+  if (pud_none(*pud) || pud_bad(*pud))
+    return 0;
+  pmd = _pmd_offset(pud, virt_addr);
+  //printk("pmd: %08lx\n", *pmd);
+  if (pmd_none(*pmd) || pmd_bad(*pmd))
+    return 0;
+  
+  pte = _pte_offset_kernel(pmd, virt_addr);
+  if (pte_none(*pte) || !pte_present(*pte))
+    return 0;
+  //printk("pte: %08lx\n", *pte);
+  
+  page_addr = pte_val(*pte) & PAGE_MASK;
+  page_offset = virt_addr & ~PAGE_MASK;
+  paddr = page_addr | page_offset;
+  
+  //printk("paddr: %08lx\n", paddr);
+  return paddr;
+}
+
 
 static int __init project1_init(void){
     project1_hook = project1_sys_func;
     project1_hook_ready = 1;
-    project1_sys_func(1415, NULL);
+    project1_sys_func(3219, NULL);
     return 0;
 }
 static void __exit project1_exit(void){
