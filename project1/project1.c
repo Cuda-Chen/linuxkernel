@@ -12,6 +12,57 @@
 int (*project1_hook)(int pid, char *result) = NULL;
 int project1_hook_ready = 0 ; 
 
+#define PTRS_PER_PGD	4
+#define PTRS_PER_PUD	1
+#define PTRS_PER_PMD	512
+#define PTRS_PER_PTE	512
+#define PGDIR_SHIFT	30
+#define PTRS_PER_PGD	4
+#define PMD_SHIFT	21
+#define PTRS_PER_PMD	512
+#define PTRS_PER_PTE	512
+#define PAGE_SHIFT	12
+#define PAGE_MASK       (~(PAGE_SIZE-1))
+#define __va(x)		((void *)((unsigned long)(x)+PAGE_OFFSET))
+#define _pgd_offset(mm, addr)           (mm->pgd + (((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1)))
+#define _pud_offset(pgd, addr)          (pgd) //skip pud on x86 with PAE
+#define _pmd_offset(pud, addr)          ((pmd_t *)(unsigned long)__va((pud->pgd.pgd) & PTE_PFN_MASK) + ((addr >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
+#define _pte_offset_kernel(pmd, addr)   ((pte_t *)(unsigned long)__va(pmd->pmd & PTE_PFN_MASK) + ((addr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr);
+
+unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr){
+  pgd_t *pgd;
+  pud_t *pud;
+  pmd_t *pmd;
+  pte_t *pte;
+  unsigned long paddr = 0;
+  unsigned long page_addr = 0;
+  unsigned long page_offset = 0;
+  pgd = _pgd_offset(mm, virt_addr);
+  printk("pgd: %08lx\n", *pgd);
+  if (pgd_none(*pgd) || pgd_bad(*pgd))
+    return 0;
+  pud = _pud_offset(pgd, virt_addr);
+  //printk("pud: %08lx\n", *pud);
+  if (pud_none(*pud) || pud_bad(*pud))
+    return 0;
+  pmd = _pmd_offset(pud, virt_addr);
+  //printk("pmd: %08lx\n", *pmd);
+  if (pmd_none(*pmd) || pmd_bad(*pmd))
+    return 0;
+  
+  pte = _pte_offset_kernel(pmd, virt_addr);
+  if (pte_none(*pte) || !pte_present(*pte))
+    return 0;
+  //printk("pte: %08lx\n", *pte);
+  
+  page_addr = pte_val(*pte) & PAGE_MASK;
+  page_offset = virt_addr & ~PAGE_MASK;
+  paddr = page_addr | page_offset;
+  
+  //printk("paddr: %08lx\n", paddr);
+  return paddr;
+}
 
 asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
 	printk("[%s] pid: %d : buf:%p \n", __FUNCTION__, pid, buf);
@@ -44,10 +95,10 @@ asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
       printk("PID: %d virtual: %08lx-%08lx\n", pid, vma->vm_start, vma->vm_end);
-      printk("PID: %d physical: %08lx-%08lx\n", pid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
-    if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
-      printk("virtual: %08lx-%08lx has corresponding physical\n", vma->vm_start, vma->vm_end);
-    } 
+      printk("PID: %d physical: %08lx-%08lx\n", pid, _virt_to_phys(mm, vma->vm_start), _virt_to_phys(mm, vma->vm_end));
+    //if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
+    //  printk("virtual: %08lx-%08lx has corresponding physical\n", vma->vm_start, vma->vm_end);
+    //} 
     vma = vma->vm_next;
   }
 
@@ -88,10 +139,10 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
       printk("PID: %d virtual: %08lx-%08lx\n", taskpid, vma->vm_start, vma->vm_end);
-      printk("PID: %d physical: %08lx-%08lx\n", taskpid, virt_to_phys(vma->vm_start), virt_to_phys(vma->vm_end));
-    if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
-      printk("virtual: %08lx-%08lx has corresponding physical\n", vma->vm_start, vma->vm_end);
-    } 
+      printk("PID: %d physical: %08lx-%08lx\n", taskpid, _virt_to_phys(mm, vma->vm_start), _virt_to_phys(mm, vma->vm_end));
+    //if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
+    //  printk("virtual: %08lx-%08lx has corresponding physical\n", vma->vm_start, vma->vm_end);
+    //} 
     vma = vma->vm_next;
   }
 
