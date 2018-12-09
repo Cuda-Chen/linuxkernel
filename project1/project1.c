@@ -30,6 +30,13 @@ int project1_hook_ready = 0 ;
 #define _pte_offset_kernel(pmd, addr)   ((pte_t *)(unsigned long)__va(pmd->pmd & PTE_PFN_MASK) + ((addr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
 unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr);
 
+
+static int bad_address(void *p)
+{
+	unsigned long dummy;
+ 	return probe_kernel_address((unsigned long *)p, dummy);
+}
+
 unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr){
   pgd_t *pgd;
   pud_t *pud;
@@ -64,6 +71,45 @@ unsigned long _virt_to_phys(struct mm_struct *mm, unsigned long virt_addr){
   return paddr;
 }
 
+void ptdump_walk_pgd(void){
+  struct task_struct *proc;
+  unsigned long lowest_paddr = 0xFFFFFFFF;
+  unsigned long highest_paddr = 0x00000000;
+  uint8_t mem_usage[0x100000] = {0};
+  unsigned long mem_total = 0;
+  for_each_process(proc){
+    printk("PID: %d state: %08lx flags:%08lx\n", proc->pid, proc->state, proc->flags);
+    struct mm_struct *mm = proc->mm;
+    if(mm==NULL){
+      mm = proc->active_mm;
+    }
+    if(mm==NULL){
+      continue;
+    }
+    struct vm_area_struct *vma = mm->mmap;
+    while(vma != NULL){
+      if(!!(vma->vm_flags & VM_HUGETLB)){
+	printk("hugetlb!\n");
+	continue;
+      }
+      unsigned long vaddr;
+      for(vaddr = vma->vm_start; vaddr < vma->vm_end; vaddr += 0x07){
+	unsigned long paddr = _virt_to_phys(mm, vaddr);
+	if(paddr != 0){
+	  lowest_paddr = paddr < lowest_paddr ? paddr : lowest_paddr;
+	  highest_paddr = paddr > highest_paddr ? paddr : highest_paddr;
+	  mem_total++;
+	}
+      }
+      break;
+      vma = vma->vm_next;
+    }
+  }
+  printk("low: %08lx high: %08lx count: %08lx\n", lowest_paddr, highest_paddr, mem_total);
+  printk("totalram_pages: %08lx\n", totalram_pages);
+  printk("totalram: %08lx\n", totalram_pages * 4096);
+}
+
 asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
 	printk("[%s] pid: %d : buf:%p \n", __FUNCTION__, pid, buf);
 	//if(1 == project1_hook_ready){
@@ -94,6 +140,7 @@ asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
 
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
+      printk("PID: %d vma flags: %08lx\n", pid, vma->vm_flags);
       printk("PID: %d virtual: %08lx-%08lx\n", pid, vma->vm_start, vma->vm_end);
       printk("PID: %d physical: %08lx-%08lx\n", pid, _virt_to_phys(mm, vma->vm_start), _virt_to_phys(mm, vma->vm_end));
     //if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
@@ -101,6 +148,8 @@ asmlinkage long sys_linux_survey_TT(int pid, char *buf) {
     //} 
     vma = vma->vm_next;
   }
+
+	//ptdump_walk_pgd();
 
 	if(1 == project1_hook_ready){
 		project1_hook(pid, buf);
@@ -138,6 +187,7 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
 
   struct vm_area_struct *vma = mm->mmap;
   while (vma != NULL){
+      printk("PID: %d vma flags: %08lx\n", taskpid, vma->vm_flags);
       printk("PID: %d virtual: %08lx-%08lx\n", taskpid, vma->vm_start, vma->vm_end);
       printk("PID: %d physical: %08lx-%08lx\n", taskpid, _virt_to_phys(mm, vma->vm_start), _virt_to_phys(mm, vma->vm_end));
     //if ((virt_to_phys(vma->vm_start) != NULL) && (virt_to_phys(vma->vm_end) != NULL)) {
@@ -145,6 +195,8 @@ asmlinkage long sys_linux_survey_VV(char *buf) {
     //} 
     vma = vma->vm_next;
   }
+
+	//ptdump_walk_pgd();
 
 	return 0;
 }
